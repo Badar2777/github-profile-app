@@ -42,7 +42,7 @@ export default function GithubProfileRTK() {
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-semibold">
-        RTK Query (Live Typing)
+        RTK Query
       </h2>
 
       <input
