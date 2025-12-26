@@ -7,113 +7,101 @@ import {
 import RepoStatsChart from "./RepoStatsChart";
 
 export default function GithubProfileRTK() {
+  const [input, setInput] = useState("");
   const [username, setUsername] = useState("");
-  const [debounced, setDebounced] = useState("");
 
-  /* ---------------- Debounce typing ---------------- */
+  /* Debounce typing */
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebounced(username.trim());
+    const t = setTimeout(() => {
+      setUsername(input.trim());
     }, 500);
+    return () => clearTimeout(t);
+  }, [input]);
 
-    return () => clearTimeout(timer);
-  }, [username]);
-
-  /* ---------------- RTK Queries ---------------- */
   const {
     data: user,
-    isLoading: userLoading,
-    isError: userError,
-  } = useGetUserQuery(debounced, {
-    skip: !debounced,
+    isLoading,
+    error,
+  } = useGetUserQuery(username, {
+    skip: !username,
   });
 
-  const {
-    data: repos = [],
-    isLoading: repoLoading,
-  } = useGetReposQuery(debounced, {
-    skip: !debounced,
+  const { data: repos = [] } = useGetReposQuery(username, {
+    skip: !username,
   });
+
+  const errorMessage =
+    error?.status === 404
+      ? "User not found"
+      : error?.status === 403
+      ? "GitHub API rate limit exceeded"
+      : error
+      ? "Something went wrong"
+      : null;
 
   return (
     <div className="space-y-6">
-      {/* Title */}
-      <h2 className="text-lg font-semibold text-gray-200">
-        RTK Query
+      <h2 className="text-lg font-semibold">
+        RTK Query (Live Typing)
       </h2>
 
-      {/* Input */}
       <input
-        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
         placeholder="Type GitHub username..."
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
         className="w-full px-4 py-3 rounded-lg bg-gray-700 text-white outline-none focus:ring-2 focus:ring-indigo-500"
       />
 
-      {/* Status */}
-      {userLoading && (
+      {isLoading && (
         <p className="text-sm text-gray-400 animate-pulse">
           Fetching profile…
         </p>
       )}
 
-      {userError && (
+      {errorMessage && (
         <p className="text-sm text-red-400">
-          User not found
+          {errorMessage}
         </p>
       )}
 
-      {/* Profile Card */}
       <AnimatePresence mode="wait">
         {user && (
           <motion.div
             key={user.login}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="bg-gray-800 rounded-xl p-5 flex items-center gap-4"
+            exit={{ opacity: 0, y: -15 }}
+            className="bg-gray-800 rounded-xl p-5 flex gap-4"
           >
             <img
               src={user.avatar_url}
               alt="avatar"
-              className="w-20 h-20 rounded-full border border-gray-600"
+              className="w-20 h-20 rounded-full"
             />
 
-            <div className="flex-1">
-              <h3 className="text-lg font-bold">
+            <div>
+              <h3 className="font-bold text-lg">
                 {user.name || user.login}
               </h3>
-              <p className="text-sm text-gray-400">
+              <p className="text-gray-400">
                 @{user.login}
               </p>
-
-              <div className="flex gap-4 mt-2 text-sm text-gray-300">
-                <span>👥 {user.followers}</span>
-                <span>📦 {user.public_repos}</span>
-              </div>
+              <p className="text-sm mt-2">
+                👥 {user.followers} | 📦{" "}
+                {user.public_repos}
+              </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Repo Section */}
-      {repoLoading && (
-        <p className="text-sm text-gray-400 animate-pulse">
-          Loading repositories…
-        </p>
-      )}
-
       {repos.length > 0 && (
         <>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {repos.slice(0, 6).map((repo) => (
-              <motion.div
+              <div
                 key={repo.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="bg-gray-800 p-4 rounded-lg flex justify-between items-center"
+                className="bg-gray-800 p-4 rounded flex justify-between"
               >
                 <div>
                   <a
@@ -132,11 +120,10 @@ export default function GithubProfileRTK() {
                 <span className="text-xs bg-indigo-600/20 text-indigo-400 px-2 py-1 rounded">
                   {repo.language || "N/A"}
                 </span>
-              </motion.div>
+              </div>
             ))}
           </div>
 
-          {/* Repo Analytics */}
           <RepoStatsChart repos={repos} />
         </>
       )}

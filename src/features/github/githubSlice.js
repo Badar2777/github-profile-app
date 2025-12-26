@@ -1,66 +1,81 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 
+const BASE_URL = "https://api.github.com";
+
+/* ================================
+   Async Thunks
+================================ */
+
 export const fetchUser = createAsyncThunk(
   "github/fetchUser",
-  async (username, { signal }) => {
-    const res = await fetch(
-      `https://api.github.com/users/${username}`,
-      { signal }
-    );
-    if (!res.ok) throw new Error("User not found");
-    return res.json();
+  async (username, { rejectWithValue }) => {
+    try {
+      const res = await fetch(`${BASE_URL}/users/${username}`);
+
+      if (!res.ok) return rejectWithValue(res.status);
+
+      return await res.json();
+    } catch {
+      return rejectWithValue("NETWORK_ERROR");
+    }
   }
 );
 
 export const fetchRepos = createAsyncThunk(
   "github/fetchRepos",
-  async ({ username, page }) => {
-    const res = await fetch(
-      `https://api.github.com/users/${username}/repos?per_page=10&page=${page}&sort=updated`
-    );
-    if (!res.ok) throw new Error("Failed to fetch repos");
-    return res.json();
+  async (username, { rejectWithValue }) => {
+    try {
+      const res = await fetch(
+        `${BASE_URL}/users/${username}/repos?sort=updated`
+      );
+
+      if (!res.ok) return rejectWithValue(res.status);
+
+      return await res.json();
+    } catch {
+      return rejectWithValue("NETWORK_ERROR");
+    }
   }
 );
+
+/* ================================
+   Slice
+================================ */
 
 const githubSlice = createSlice({
   name: "github",
   initialState: {
     user: null,
     repos: [],
-    loadingUser: false,
-    loadingRepos: false,
+    loading: false,
     error: null,
   },
   reducers: {
     clearAll: (state) => {
       state.user = null;
       state.repos = [];
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchUser.pending, (s) => {
-        s.loadingUser = true;
-        s.error = null;
+      /* USER */
+      .addCase(fetchUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
-      .addCase(fetchUser.fulfilled, (s, a) => {
-        s.loadingUser = false;
-        s.user = a.payload;
+      .addCase(fetchUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
       })
-      .addCase(fetchUser.rejected, (s, a) => {
-        s.loadingUser = false;
-        s.error = a.error.message;
+      .addCase(fetchUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
-      .addCase(fetchRepos.pending, (s) => {
-        s.loadingRepos = true;
-      })
-      .addCase(fetchRepos.fulfilled, (s, a) => {
-        s.loadingRepos = false;
-        s.repos.push(...a.payload);
-      })
-      .addCase(fetchRepos.rejected, (s) => {
-        s.loadingRepos = false;
+
+      /* REPOS */
+      .addCase(fetchRepos.fulfilled, (state, action) => {
+        state.repos = action.payload;
       });
   },
 });

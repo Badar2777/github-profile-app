@@ -1,94 +1,88 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchUser,
-  fetchRepos,
-  clearAll,
-} from "../features/github/githubSlice";
 import { motion, AnimatePresence } from "framer-motion";
+import { fetchUser, fetchRepos } from "../features/github/githubSlice";
+import RepoStatsChart from "./RepoStatsChart";
 
 export default function GithubProfileThunk() {
-  const dispatch = useDispatch();
+  const [input, setInput] = useState("");
   const [username, setUsername] = useState("");
-  const [page, setPage] = useState(1);
 
-  const {
-    user,
-    repos,
-    loadingUser,
-    loadingRepos,
-    error,
-  } = useSelector((s) => s.github);
+  const dispatch = useDispatch();
+  const { user, repos, loading, error } = useSelector(
+    (state) => state.github
+  );
 
+  // Trigger API fetch when username changes
   useEffect(() => {
-    if (!username) return;
-    const t = setTimeout(() => {
-      dispatch(clearAll());
+    if (username) {
       dispatch(fetchUser(username));
-      dispatch(fetchRepos({ username, page: 1 }));
-      setPage(1);
-    }, 500);
-    return () => clearTimeout(t);
+      dispatch(fetchRepos(username));
+    }
   }, [username, dispatch]);
 
-  const loadMore = () => {
-    dispatch(fetchRepos({ username, page: page + 1 }));
-    setPage((p) => p + 1);
-  };
+  // Live typing effect with debounce
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (input.trim()) {
+        setUsername(input.trim());
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [input]);
+
+  const errorMessage =
+    error === 404
+      ? "User not found"
+      : error === 403
+      ? "GitHub API rate limit exceeded"
+      : error
+      ? "Something went wrong"
+      : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <h2 className="text-lg font-semibold">Redux Thunk (Live Typing)</h2>
+
       <input
-        className="w-full p-3 rounded bg-gray-700"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
         placeholder="Type GitHub username..."
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        className="w-full px-4 py-3 rounded-lg bg-gray-700 text-white outline-none focus:ring-2 focus:ring-indigo-500"
       />
 
-      {loadingUser && (
-        <p className="text-sm text-gray-400">Searching...</p>
+      {loading && (
+        <p className="text-sm text-gray-400 animate-pulse">
+          Fetching profile…
+        </p>
       )}
-      {error && <p className="text-red-400">{error}</p>}
 
-      <AnimatePresence>
+      {errorMessage && <p className="text-sm text-red-400">{errorMessage}</p>}
+
+      <AnimatePresence mode="wait">
         {user && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-gray-700 p-4 rounded-xl"
+            key={user.login}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="bg-gray-800 rounded-xl p-5 flex gap-4"
           >
-            <h2 className="font-bold">{user.login}</h2>
+            <img
+              src={user.avatar_url}
+              alt="avatar"
+              className="w-20 h-20 rounded-full"
+            />
+
+            <div>
+              <h3 className="font-bold text-lg">{user.name || user.login}</h3>
+              <p className="text-gray-400">@{user.login}</p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {loadingRepos && (
-        <p className="text-sm text-gray-400">
-          Loading repositories...
-        </p>
-      )}
-
-    {repos.map((repo) => (
-  <motion.div
-    key={repo.id}
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    className="bg-gray-800 p-4 rounded flex justify-between items-center"
-  >
-    <div>
-      <p className="font-semibold">{repo.name}</p>
-      <p className="text-xs text-gray-400">
-        ⭐ {repo.stargazers_count}
-      </p>
-    </div>
-
-    <span className="text-xs bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded">
-      {repo.language || "N/A"}
-    </span>
-  </motion.div>
-))}
-
-
+      {repos.length > 0 && <RepoStatsChart repos={repos} />}
     </div>
   );
 }
